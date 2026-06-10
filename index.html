@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PriceWatch</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0b1120;
+    --surface:  #111827;
+    --surface2: #1e293b;
+    --border:   #1e293b;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --accent:   #34d399;
+    --accent2:  #818cf8;
+    --danger:   #f87171;
+    --warn:     #fbbf24;
+    --radius:   10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 28px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .logo { font-size: 19px; font-weight: 700; letter-spacing: -.5px; color: var(--accent); }
+  .logo span { color: var(--text); }
+  header .spacer { flex: 1; }
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--muted); background: var(--surface2); padding: 4px 10px; border-radius: 99px;
+  }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 20px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .7px; margin-bottom: 14px;
+  }
+
+  /* ── Forms ── */
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type=text], input[type=url], input[type=password], input[type=number] {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 7px; padding: 9px 13px;
+    font-size: 13px; outline: none; transition: border-color .15s; width: 100%;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+
+  .btn {
+    padding: 9px 18px; border-radius: 7px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap;
+  }
+  .btn:hover { opacity: .82; }
+  .btn-primary   { background: var(--accent);   color: #0b1120; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger    { background: transparent; color: var(--danger); border: 1px solid #3b1f1f; padding: 5px 10px; font-size: 12px; }
+  .btn-ghost     { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 5px; transition: color .15s; }
+  .btn-ghost:hover { color: var(--accent); }
+  .btn-sm  { padding: 6px 13px; font-size: 12px; }
+  .btn-xs  { padding: 4px 9px;  font-size: 11px; border-radius: 6px; }
+
+  .error-msg { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+  .ok-msg    { color: var(--accent); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar h2 { font-size: 15px; font-weight: 700; flex: 1; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  td { padding: 12px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: #131f35; }
+  .url-cell { max-width: 260px; }
+  .url-cell a { color: var(--accent2); text-decoration: none; font-size: 12px; word-break: break-all; }
+  .url-cell a:hover { text-decoration: underline; }
+  .name-cell { font-weight: 500; font-size: 13px; max-width: 200px; }
+  .price-cell { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .price-cell .cur { color: var(--muted); font-size: 11px; margin-right: 2px; }
+  .badge-sale { display:inline-block; padding:3px 8px; border-radius:99px; font-size:11px; font-weight:700; background:#132a1e; color:var(--accent); }
+  .badge-up   { display:inline-block; padding:3px 8px; border-radius:99px; font-size:11px; font-weight:700; background:#2a1313; color:var(--danger); }
+  .badge-flat { color:var(--muted); font-size:12px; }
+  .chart-btn  { background:transparent; border:1px solid var(--border); color:var(--muted); cursor:pointer; padding:4px 9px; border-radius:6px; font-size:11px; transition:all .15s; }
+  .chart-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+  .empty-row td { text-align:center; color:var(--muted); padding:40px; }
+
+  /* ── Notification config ── */
+  .notif-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .notif-channel {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+  }
+  .notif-channel.active { border-color: var(--accent); }
+  .channel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .channel-icon { font-size: 18px; }
+  .channel-name { font-weight: 700; font-size: 13px; flex: 1; }
+  .toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0; background: var(--border);
+    border-radius: 20px; cursor: pointer; transition: background .2s;
+  }
+  .slider::before {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    background: white; border-radius: 50%; left: 3px; top: 3px; transition: transform .2s;
+  }
+  .toggle-switch input:checked + .slider { background: var(--accent); }
+  .toggle-switch input:checked + .slider::before { transform: translateX(16px); }
+  .channel-fields { display: flex; flex-direction: column; gap: 8px; }
+  .channel-fields .field { display: flex; flex-direction: column; gap: 3px; }
+  .test-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .test-status { font-size: 11px; }
+  .test-status.ok  { color: var(--accent); }
+  .test-status.err { color: var(--danger); }
+
+  .config-actions { display: flex; align-items: center; gap: 12px; }
+  .base-url-row { display: flex; gap: 10px; align-items: flex-end; }
+  .base-url-row > div { flex: 1; }
+
+  /* ── Chart modal ── */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.72); z-index: 100; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; width: min(700px, 95vw); position: relative;
+  }
+  .modal h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .modal .sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .close-btn {
+    position: absolute; top: 16px; right: 16px;
+    background: var(--surface2); border: none; color: var(--muted);
+    border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: 16px;
+  }
+  .close-btn:hover { color: var(--text); }
+
+  /* deals filter banner */
+  #dealsBanner {
+    display: none; background: #132a1e; border: 1px solid #1e4a30;
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 14px;
+    font-size: 13px; color: var(--accent); align-items: center; gap: 10px;
+  }
+  #dealsBanner.show { display: flex; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">price<span>watch</span></div>
+  <div class="spacer"></div>
+  <div id="lastUpdate" class="badge">Never refreshed</div>
+</header>
+
+<main>
+  <!-- Add product -->
+  <div class="card">
+    <div class="card-title">Track a new product</div>
+    <div class="form-row">
+      <div style="flex:2;min-width:200px"><input id="inUrl"   type="url"  placeholder="Product URL" /></div>
+      <div style="flex:1;min-width:160px"><input id="inClass" type="text" placeholder="CSS price class" /></div>
+      <div style="flex:1;min-width:150px"><input id="inName"  type="text" placeholder="Nickname (optional)" /></div>
+      <button class="btn btn-primary" onclick="addProduct()" id="addBtn">Add product</button>
+    </div>
+    <div id="addError" class="error-msg"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="toolbar">
+    <h2>Tracked products</h2>
+    <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh all</button>
+    <button class="btn btn-secondary btn-sm" onclick="sendAllNotifications()">🔔 Send deals now</button>
+  </div>
+
+  <div id="dealsBanner">
+    🏷️ Showing only products on sale — <a href="/" style="color:var(--accent);margin-left:4px">Show all</a>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th><th>URL</th><th>Price</th><th>vs peak</th><th>History</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="empty-row"><td colspan="6">No products yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Notifications config -->
+  <div class="card" style="margin-top:28px">
+    <div class="card-title">Notifications</div>
+
+    <!-- Base URL -->
+    <div style="margin-bottom:18px">
+      <div class="base-url-row">
+        <div>
+          <label>PriceWatch base URL <span style="color:var(--muted);font-weight:400">(used in notification links — leave blank to auto-detect local IP)</span></label>
+          <input id="cfgBaseUrl" type="text" placeholder="e.g. http://192.168.1.42:5000" />
+        </div>
+      </div>
+    </div>
+
+    <div class="notif-grid">
+
+      <!-- Email -->
+      <div class="notif-channel" id="ch-email">
+        <div class="channel-header">
+          <span class="channel-icon">✉️</span>
+          <span class="channel-name">Email</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tog-email" onchange="toggleChannel('email',this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="channel-fields" id="fields-email">
+          <div class="field"><label>SMTP host</label><input id="cfgSmtpHost" placeholder="smtp.gmail.com" /></div>
+          <div class="field"><label>SMTP port</label><input id="cfgSmtpPort" type="number" placeholder="465" /></div>
+          <div class="field"><label>SMTP user</label><input id="cfgSmtpUser" placeholder="you@gmail.com" /></div>
+          <div class="field"><label>SMTP password / app password</label><input id="cfgSmtpPass" type="password" placeholder="••••••••" /></div>
+          <div class="field"><label>From</label><input id="cfgSmtpFrom" placeholder="you@gmail.com" /></div>
+          <div class="field"><label>To</label><input id="cfgSmtpTo"   placeholder="you@gmail.com" /></div>
+        </div>
+        <div class="test-row">
+          <button class="btn btn-secondary btn-xs" onclick="testChannel('email')">Send test</button>
+          <span id="test-email" class="test-status"></span>
+        </div>
+      </div>
+
+      <!-- Telegram -->
+      <div class="notif-channel" id="ch-telegram">
+        <div class="channel-header">
+          <span class="channel-icon">✈️</span>
+          <span class="channel-name">Telegram</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tog-telegram" onchange="toggleChannel('telegram',this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="channel-fields" id="fields-telegram">
+          <div class="field">
+            <label>Bot token <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent2);font-size:10px">(get from @BotFather)</a></label>
+            <input id="cfgTgToken" type="password" placeholder="123456:ABC-DEF..." />
+          </div>
+          <div class="field">
+            <label>Chat ID <a href="#" onclick="howToGetChatId()" style="color:var(--accent2);font-size:10px">how?</a></label>
+            <input id="cfgTgChat" placeholder="123456789" />
+          </div>
+        </div>
+        <div class="test-row">
+          <button class="btn btn-secondary btn-xs" onclick="testChannel('telegram')">Send test</button>
+          <span id="test-telegram" class="test-status"></span>
+        </div>
+      </div>
+
+      <!-- ntfy -->
+      <div class="notif-channel" id="ch-ntfy">
+        <div class="channel-header">
+          <span class="channel-icon">🔔</span>
+          <span class="channel-name">ntfy</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tog-ntfy" onchange="toggleChannel('ntfy',this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="channel-fields" id="fields-ntfy">
+          <div class="field">
+            <label>Server <span style="color:var(--muted);font-weight:400">(blank = ntfy.sh public)</span></label>
+            <input id="cfgNtfyServer" placeholder="http://192.168.1.42:9991" />
+          </div>
+          <div class="field">
+            <label>Topic <span style="color:var(--muted);font-weight:400">(keep it secret if using ntfy.sh)</span></label>
+            <input id="cfgNtfyTopic" placeholder="pricewatch-abc123" />
+          </div>
+        </div>
+        <div class="test-row">
+          <button class="btn btn-secondary btn-xs" onclick="testChannel('ntfy')">Send test</button>
+          <span id="test-ntfy" class="test-status"></span>
+        </div>
+      </div>
+
+      <!-- Gotify -->
+      <div class="notif-channel" id="ch-gotify">
+        <div class="channel-header">
+          <span class="channel-icon">📡</span>
+          <span class="channel-name">Gotify</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tog-gotify" onchange="toggleChannel('gotify',this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="channel-fields" id="fields-gotify">
+          <div class="field">
+            <label>Gotify server URL</label>
+            <input id="cfgGotifyServer" placeholder="http://192.168.1.42:9990" />
+          </div>
+          <div class="field">
+            <label>App token</label>
+            <input id="cfgGotifyToken" type="password" placeholder="Axxxxxxxxxx" />
+          </div>
+        </div>
+        <div class="test-row">
+          <button class="btn btn-secondary btn-xs" onclick="testChannel('gotify')">Send test</button>
+          <span id="test-gotify" class="test-status"></span>
+        </div>
+      </div>
+
+
+      <!-- Web Push -->
+      <div class="notif-channel" id="ch-webpush">
+        <div class="channel-header">
+          <span class="channel-icon">🌐</span>
+          <span class="channel-name">Browser Push</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tog-webpush" onchange="toggleChannel('webpush',this.checked)" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="webpush-status" style="font-size:12px;color:var(--muted);margin-bottom:10px">Checking…</div>
+        <button class="btn btn-secondary btn-xs" id="webpush-btn" onclick="togglePushSubscription()" style="display:none">Enable notifications</button>
+        <div id="webpush-sub-count" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        <div class="test-row" style="margin-top:10px">
+          <button class="btn btn-secondary btn-xs" onclick="testChannel('webpush')">Send test</button>
+          <span id="test-webpush" class="test-status"></span>
+        </div>
+      </div>
+
+    </div><!-- /notif-grid -->
+
+    <div class="config-actions">
+      <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save all settings</button>
+      <span id="cfgStatus" style="font-size:12px;color:var(--accent)"></span>
+    </div>
+  </div>
+
+</main>
+
+<!-- Chart modal -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">✕</button>
+    <h3 id="modalTitle"></h3>
+    <div class="sub" id="modalSub"></div>
+    <canvas id="priceChart" height="220"></canvas>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let products = [];
+let chartInst = null;
+const filterDeals = new URLSearchParams(location.search).get("filter") === "deals";
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  await loadProducts();
+  await loadConfig();
+  await initWebPush();
+  if (filterDeals) document.getElementById("dealsBanner").classList.add("show");
+})();
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || "Request failed");
+  return j;
+}
+
+// ── Products ──────────────────────────────────────────────────────────────
+async function loadProducts() {
+  products = await api("/api/products");
+  renderTable();
+}
+
+function isOnSale(p) {
+  const h = p.history || [];
+  if (h.length < 2) return false;
+  const cur = h[h.length - 1].price;
+  const max = Math.max(...h.slice(0, -1).map(x => x.price));
+  return max > 0 && (max - cur) / max * 100 >= 1;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("tbody");
+  const list = filterDeals ? products.filter(isOnSale) : products;
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${filterDeals ? "No deals right now." : "No products yet — add one above."}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => {
+    const h = p.history || [];
+    const cur = h.length ? h[h.length - 1].price : null;
+    const maxP = h.length > 1 ? Math.max(...h.slice(0, -1).map(x => x.price)) : null;
+
+    let badge = '<span class="badge-flat">—</span>';
+    if (cur !== null && maxP !== null) {
+      const pct = (maxP - cur) / maxP * 100;
+      if (pct > 0.5)       badge = `<span class="badge-sale">▼ ${pct.toFixed(1)}%</span>`;
+      else if (pct < -0.5) badge = `<span class="badge-up">▲ ${Math.abs(pct).toFixed(1)}%</span>`;
+      else                  badge = `<span class="badge-flat">= flat</span>`;
+    }
+
+    const priceStr = cur !== null
+      ? `<span class="cur">€</span>${cur.toFixed(2)}`
+      : '<span style="color:var(--muted)">—</span>';
+
+    const shortUrl = p.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 42);
+
+    return `<tr>
+      <td class="name-cell">${esc(p.name || p.url)}</td>
+      <td class="url-cell"><a href="${esc(p.url)}" target="_blank">${esc(shortUrl)}</a></td>
+      <td class="price-cell">${priceStr}</td>
+      <td>${badge}</td>
+      <td><button class="chart-btn" onclick="openChart('${p.id}')">📈 chart</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-ghost" title="Refresh" onclick="refreshOne('${p.id}')">↻</button>
+        <button class="btn btn-danger" onclick="del('${p.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+async function addProduct() {
+  const url  = document.getElementById("inUrl").value.trim();
+  const cls  = document.getElementById("inClass").value.trim();
+  const name = document.getElementById("inName").value.trim();
+  const errEl = document.getElementById("addError");
+  const btn   = document.getElementById("addBtn");
+
+  errEl.style.display = "none";
+  if (!url || !cls) { showErr(errEl, "URL and CSS class are required."); return; }
+
+  btn.textContent = "Adding…"; btn.disabled = true;
+  try {
+    const p = await api("/api/products", { method: "POST", body: JSON.stringify({ url, css_class: cls, name }) });
+    products.push(p);
+    renderTable();
+    ["inUrl","inClass","inName"].forEach(id => document.getElementById(id).value = "");
+    setLastUpdate();
+  } catch (e) {
+    showErr(errEl, e.message);
+  } finally {
+    btn.textContent = "Add product"; btn.disabled = false;
+  }
+}
+
+async function del(id) {
+  if (!confirm("Remove this product?")) return;
+  await api(`/api/products/${id}`, { method: "DELETE" });
+  products = products.filter(p => p.id !== id);
+  renderTable();
+}
+
+async function refreshOne(id) {
+  const updated = await api(`/api/products/${id}/refresh`, { method: "POST" });
+  const i = products.findIndex(p => p.id === id);
+  if (i !== -1) products[i] = updated;
+  renderTable(); setLastUpdate();
+}
+
+async function refreshAll() {
+  await api("/api/refresh-all", { method: "POST" });
+  await loadProducts(); setLastUpdate();
+}
+
+async function sendAllNotifications() {
+  try {
+    const r = await api("/api/notify", { method: "POST" });
+    if (r.message) { alert(r.message); return; }
+    const ok  = r.results.filter(x => x.ok).map(x => x.channel).join(", ");
+    const err = r.results.filter(x => !x.ok).map(x => `${x.channel}: ${x.error}`).join("\n");
+    let msg = ok ? `✓ Sent via: ${ok}` : "No channels succeeded.";
+    if (err) msg += `\n\nErrors:\n${err}`;
+    alert(msg);
+  } catch (e) { alert("Error: " + e.message); }
+}
+
+// ── Config ────────────────────────────────────────────────────────────────
+const CH_MAP = {
+  email:    { tog: "tog-email",    key: "email_enabled" },
+  telegram: { tog: "tog-telegram", key: "telegram_enabled" },
+  ntfy:     { tog: "tog-ntfy",     key: "ntfy_enabled" },
+  gotify:   { tog: "tog-gotify",   key: "gotify_enabled" },
+};
+
+function toggleChannel(ch, on) {
+  document.getElementById(`ch-${ch}`).classList.toggle("active", on);
+}
+
+async function loadConfig() {
+  try {
+    const cfg = await api("/api/config");
+    if (cfg.base_url)     document.getElementById("cfgBaseUrl").value    = cfg.base_url;
+    if (cfg.smtp_host)    document.getElementById("cfgSmtpHost").value   = cfg.smtp_host;
+    if (cfg.smtp_port)    document.getElementById("cfgSmtpPort").value   = cfg.smtp_port;
+    if (cfg.smtp_user)    document.getElementById("cfgSmtpUser").value   = cfg.smtp_user;
+    if (cfg.smtp_from)    document.getElementById("cfgSmtpFrom").value   = cfg.smtp_from;
+    if (cfg.smtp_to)      document.getElementById("cfgSmtpTo").value     = cfg.smtp_to;
+    if (cfg.ntfy_server)  document.getElementById("cfgNtfyServer").value = cfg.ntfy_server;
+    if (cfg.ntfy_topic)   document.getElementById("cfgNtfyTopic").value  = cfg.ntfy_topic;
+    if (cfg.gotify_server)document.getElementById("cfgGotifyServer").value = cfg.gotify_server;
+    if (cfg.telegram_chat_id) document.getElementById("cfgTgChat").value = cfg.telegram_chat_id;
+
+    for (const [ch, {tog, key}] of Object.entries(CH_MAP)) {
+      const on = !!cfg[key];
+      document.getElementById(tog).checked = on;
+      toggleChannel(ch, on);
+    }
+  } catch {}
+}
+
+async function saveConfig() {
+  const cfg = {
+    base_url:         document.getElementById("cfgBaseUrl").value.trim(),
+    smtp_host:        document.getElementById("cfgSmtpHost").value.trim(),
+    smtp_port:        document.getElementById("cfgSmtpPort").value.trim() || "465",
+    smtp_user:        document.getElementById("cfgSmtpUser").value.trim(),
+    smtp_from:        document.getElementById("cfgSmtpFrom").value.trim(),
+    smtp_to:          document.getElementById("cfgSmtpTo").value.trim(),
+    ntfy_server:      document.getElementById("cfgNtfyServer").value.trim(),
+    ntfy_topic:       document.getElementById("cfgNtfyTopic").value.trim(),
+    gotify_server:    document.getElementById("cfgGotifyServer").value.trim(),
+    telegram_chat_id: document.getElementById("cfgTgChat").value.trim(),
+  };
+  // Only include secrets if the user typed something
+  const smtpPass = document.getElementById("cfgSmtpPass").value;
+  if (smtpPass) cfg.smtp_password = smtpPass;
+  const tgToken = document.getElementById("cfgTgToken").value;
+  if (tgToken) cfg.telegram_token = tgToken;
+  const gotifyToken = document.getElementById("cfgGotifyToken").value;
+  if (gotifyToken) cfg.gotify_token = gotifyToken;
+
+  for (const [ch, {tog, key}] of Object.entries(CH_MAP)) {
+    cfg[key] = document.getElementById(tog).checked;
+  }
+
+  await api("/api/config", { method: "POST", body: JSON.stringify(cfg) });
+  const st = document.getElementById("cfgStatus");
+  st.textContent = "Saved ✓"; setTimeout(() => st.textContent = "", 3000);
+}
+
+async function testChannel(ch) {
+  const el = document.getElementById(`test-${ch}`);
+  el.textContent = "Sending…"; el.className = "test-status";
+  try {
+    await api(`/api/test-notify/${ch}`, { method: "POST" });
+    el.textContent = "✓ Sent!"; el.className = "test-status ok";
+  } catch (e) {
+    el.textContent = "✗ " + e.message; el.className = "test-status err";
+  }
+  setTimeout(() => el.textContent = "", 8000);
+}
+
+function howToGetChatId() {
+  alert(
+    "How to get your Telegram Chat ID:\n\n" +
+    "1. Start a chat with your bot (or add it to a group).\n" +
+    "2. Send any message to it.\n" +
+    "3. Open this URL in a browser:\n" +
+    "   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates\n" +
+    "4. Find 'chat' → 'id' in the JSON response."
+  );
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────
+function openChart(id) {
+  const p = products.find(x => x.id === id);
+  if (!p || !p.history.length) return;
+
+  document.getElementById("modalTitle").textContent = p.name || p.url;
+  document.getElementById("modalSub").textContent =
+    `${p.history.length} data point(s) · class: ${p.css_class}`;
+
+  const labels = p.history.map(h => new Date(h.date).toLocaleDateString("es-ES"));
+  const prices = p.history.map(h => h.price);
+  const maxP   = Math.max(...prices);
+
+  if (chartInst) chartInst.destroy();
+  const ctx = document.getElementById("priceChart").getContext("2d");
+  chartInst = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Price (€)",
+        data: prices,
+        borderColor: "#34d399",
+        backgroundColor: "rgba(52,211,153,.08)",
+        pointBackgroundColor: prices.map(v => v < maxP ? "#34d399" : "#818cf8"),
+        pointRadius: 5,
+        tension: 0.3,
+        fill: true,
+      }],
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => `€${c.parsed.y.toFixed(2)}`,
+            afterLabel: c => {
+              const pct = (maxP - c.parsed.y) / maxP * 100;
+              return pct > 0.5 ? `▼ ${pct.toFixed(1)}% below peak` : "";
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: "#64748b" }, grid: { color: "#1e293b" } },
+        y: { ticks: { color: "#64748b", callback: v => `€${v}` }, grid: { color: "#1e293b" } },
+      },
+    },
+  });
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById("modalBackdrop")) return;
+  document.getElementById("modalBackdrop").classList.remove("open");
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────
+function showErr(el, msg) { el.textContent = msg; el.style.display = "block"; }
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function setLastUpdate() {
+  document.getElementById("lastUpdate").textContent =
+    "Updated " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+
+// ── Web Push ───────────────────────────────────────────────────────────────
+let swReg = null;
+
+async function initWebPush() {
+  const statusEl = document.getElementById("webpush-status");
+  const btn      = document.getElementById("webpush-btn");
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    statusEl.textContent = "Not supported in this browser.";
+    return;
+  }
+  if (location.protocol !== "https:" && location.hostname !== "localhost") {
+    statusEl.textContent = "Requires HTTPS — see setup notes.";
+    return;
+  }
+
+  try {
+    swReg = await navigator.serviceWorker.register("/static/sw.js");
+    await navigator.serviceWorker.ready;
+    btn.style.display = "inline-block";
+    await refreshPushState();
+  } catch (e) {
+    statusEl.textContent = "SW registration failed: " + e.message;
+  }
+}
+
+async function refreshPushState() {
+  if (!swReg) return;
+  const statusEl = document.getElementById("webpush-status");
+  const btn      = document.getElementById("webpush-btn");
+  const cntEl    = document.getElementById("webpush-sub-count");
+
+  const sub = await swReg.pushManager.getSubscription();
+  const perm = Notification.permission;
+
+  if (perm === "denied") {
+    statusEl.textContent = "Notifications blocked — allow them in browser settings.";
+    statusEl.style.color = "var(--danger)";
+    btn.style.display = "none";
+    return;
+  }
+  if (sub) {
+    statusEl.textContent = "✓ Notifications enabled on this device.";
+    statusEl.style.color = "var(--accent)";
+    btn.textContent = "Disable notifications";
+    document.getElementById("ch-webpush").classList.add("active");
+  } else {
+    statusEl.textContent = "Notifications not enabled on this device yet.";
+    statusEl.style.color = "var(--muted)";
+    btn.textContent = "Enable notifications";
+    document.getElementById("ch-webpush").classList.remove("active");
+  }
+  btn.style.display = "inline-block";
+
+  // Show total count from server
+  try {
+    const r = await api("/api/push/subscriptions/count");
+    cntEl.textContent = r.count > 0 ? `${r.count} device(s) subscribed total` : "";
+  } catch {}
+}
+
+async function togglePushSubscription() {
+  if (!swReg) return;
+  const sub = await swReg.pushManager.getSubscription();
+  if (sub) {
+    await sub.unsubscribe();
+    await fetch("/api/push/unsubscribe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+  } else {
+    const keyResp = await api("/api/push/vapid-public-key");
+    const vapidKey = urlBase64ToUint8Array(keyResp.key);
+    try {
+      const newSub = await swReg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKey,
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSub.toJSON()),
+      });
+    } catch (e) {
+      alert("Could not subscribe: " + e.message);
+    }
+  }
+  await refreshPushState();
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+</script>
