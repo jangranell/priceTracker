@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PriceTracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <header>
+      <div class="logo">Price<span>Tracker</span></div>
+      <div class="spacer"></div>
+      <select id="themeSelector" class="btn btn-secondary">
+        <option value="01">01</option>
+        <option value="light">Light</option>
+      </select>
+      <div id="lastUpdate" class="badge">Never refreshed</div>
+    </header>
+
+    <main>
+      <!-- Add product -->
+      <div class="card">
+        <div class="card-title">Track a new product</div>
+        <div class="form-row">
+          <div style="flex: 2; min-width: 200px">
+            <input id="inUrl" type="url" placeholder="Product URL" />
+          </div>
+          <div style="flex: 1; min-width: 160px">
+            <input id="inClass" type="text" placeholder="CSS price class" />
+          </div>
+          <div style="flex: 1; min-width: 150px">
+            <input id="inName" type="text" placeholder="Nickname (optional)" />
+          </div>
+          <button class="btn btn-primary" onclick="addProduct()" id="addBtn">
+            Add product
+          </button>
+        </div>
+        <div id="addError" class="error-msg"></div>
+      </div>
+
+      <!-- Table -->
+      <div class="toolbar">
+        <h2>Tracked products</h2>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAll()">
+          ↻ Refresh all
+        </button>
+        <button
+          class="btn btn-secondary btn-sm"
+          onclick="sendAllNotifications()"
+        >
+          🔔 Send deals now
+        </button>
+      </div>
+
+      <div id="dealsBanner">
+        🏷️ Showing only products on sale —
+        <a href="/" style="color: var(--accent); margin-left: 4px">Show all</a>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>URL</th>
+              <th>Price</th>
+              <th>vs peak</th>
+              <th>History</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr class="empty-row">
+              <td colspan="6">No products yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Notifications config -->
+      <div class="card" style="margin-top: 28px">
+        <div class="card-title">Notifications</div>
+
+        <!-- Base URL -->
+        <div style="margin-bottom: 18px">
+          <div class="base-url-row">
+            <div>
+              <label
+                >PriceTracker base URL
+                <span style="color: var(--muted); font-weight: 400"
+                  >(used in notification links — leave blank to auto-detect
+                  local IP)</span
+                ></label
+              >
+              <input
+                id="cfgBaseUrl"
+                type="text"
+                placeholder="e.g. http://192.168.1.1:5000"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="notif-grid">
+          <!-- Email -->
+          <div class="notif-channel" id="ch-email">
+            <div class="channel-header">
+              <span class="channel-icon">✉️</span>
+              <span class="channel-name">Email</span>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="tog-email"
+                  onchange="toggleChannel('email', this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="channel-fields" id="fields-email">
+              <div class="field">
+                <label>SMTP host</label
+                ><input id="cfgSmtpHost" placeholder="smtp.gmail.com" />
+              </div>
+              <div class="field">
+                <label>SMTP port</label
+                ><input id="cfgSmtpPort" type="number" placeholder="465" />
+              </div>
+              <div class="field">
+                <label>SMTP user</label
+                ><input id="cfgSmtpUser" placeholder="you@gmail.com" />
+              </div>
+              <div class="field">
+                <label>SMTP password / app password</label
+                ><input
+                  id="cfgSmtpPass"
+                  type="password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div class="field">
+                <label>From</label
+                ><input id="cfgSmtpFrom" placeholder="you@gmail.com" />
+              </div>
+              <div class="field">
+                <label>To</label
+                ><input id="cfgSmtpTo" placeholder="you@gmail.com" />
+              </div>
+            </div>
+            <div class="test-row">
+              <button
+                class="btn btn-secondary btn-xs"
+                onclick="testChannel('email')"
+              >
+                Send test
+              </button>
+              <span id="test-email" class="test-status"></span>
+            </div>
+          </div>
+
+          <!-- Telegram -->
+          <div class="notif-channel" id="ch-telegram">
+            <div class="channel-header">
+              <span class="channel-icon">✈️</span>
+              <span class="channel-name">Telegram</span>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="tog-telegram"
+                  onchange="toggleChannel('telegram', this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="channel-fields" id="fields-telegram">
+              <div class="field">
+                <label
+                  >Bot token
+                  <a
+                    href="https://t.me/BotFather"
+                    target="_blank"
+                    style="color: var(--accent2); font-size: 10px"
+                    >(get from @BotFather)</a
+                  ></label
+                >
+                <input
+                  id="cfgTgToken"
+                  type="password"
+                  placeholder="123456:ABC-DEF..."
+                />
+              </div>
+              <div class="field">
+                <label
+                  >Chat ID
+                  <a
+                    href="#"
+                    onclick="howToGetChatId()"
+                    style="color: var(--accent2); font-size: 10px"
+                    >how?</a
+                  ></label
+                >
+                <input id="cfgTgChat" placeholder="123456789" />
+              </div>
+            </div>
+            <div class="test-row">
+              <button
+                class="btn btn-secondary btn-xs"
+                onclick="testChannel('telegram')"
+              >
+                Send test
+              </button>
+              <span id="test-telegram" class="test-status"></span>
+            </div>
+          </div>
+
+          <!-- ntfy -->
+          <div class="notif-channel" id="ch-ntfy">
+            <div class="channel-header">
+              <span class="channel-icon">🔔</span>
+              <span class="channel-name">ntfy</span>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="tog-ntfy"
+                  onchange="toggleChannel('ntfy', this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="channel-fields" id="fields-ntfy">
+              <div class="field">
+                <label
+                  >Server
+                  <span style="color: var(--muted); font-weight: 400"
+                    >(blank = ntfy.sh public)</span
+                  ></label
+                >
+                <input
+                  id="cfgNtfyServer"
+                  placeholder="http://192.168.1.1:9991"
+                />
+              </div>
+              <div class="field">
+                <label
+                  >Topic
+                  <span style="color: var(--muted); font-weight: 400"
+                    >(keep it secret if using ntfy.sh)</span
+                  ></label
+                >
+                <input id="cfgNtfyTopic" placeholder="PriceTracker-abc123" />
+              </div>
+            </div>
+            <div class="test-row">
+              <button
+                class="btn btn-secondary btn-xs"
+                onclick="testChannel('ntfy')"
+              >
+                Send test
+              </button>
+              <span id="test-ntfy" class="test-status"></span>
+            </div>
+          </div>
+
+          <!-- Gotify -->
+          <div class="notif-channel" id="ch-gotify">
+            <div class="channel-header">
+              <span class="channel-icon">📡</span>
+              <span class="channel-name">Gotify</span>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="tog-gotify"
+                  onchange="toggleChannel('gotify', this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="channel-fields" id="fields-gotify">
+              <div class="field">
+                <label>Gotify server URL</label>
+                <input
+                  id="cfgGotifyServer"
+                  placeholder="http://192.168.1.1:9990"
+                />
+              </div>
+              <div class="field">
+                <label>App token</label>
+                <input
+                  id="cfgGotifyToken"
+                  type="password"
+                  placeholder="Axxxxxxxxxx"
+                />
+              </div>
+            </div>
+            <div class="test-row">
+              <button
+                class="btn btn-secondary btn-xs"
+                onclick="testChannel('gotify')"
+              >
+                Send test
+              </button>
+              <span id="test-gotify" class="test-status"></span>
+            </div>
+          </div>
+
+          <!-- Web Push -->
+          <div class="notif-channel" id="ch-webpush">
+            <div class="channel-header">
+              <span class="channel-icon">🌐</span>
+              <span class="channel-name">Browser Push</span>
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  id="tog-webpush"
+                  onchange="toggleChannel('webpush', this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div
+              id="webpush-status"
+              style="font-size: 12px; color: var(--muted); margin-bottom: 10px"
+            >
+              Checking…
+            </div>
+            <button
+              class="btn btn-secondary btn-xs"
+              id="webpush-btn"
+              onclick="togglePushSubscription()"
+              style="display: none"
+            >
+              Enable notifications
+            </button>
+            <div
+              id="webpush-sub-count"
+              style="font-size: 11px; color: var(--muted); margin-top: 6px"
+            ></div>
+            <div class="test-row" style="margin-top: 10px">
+              <button
+                class="btn btn-secondary btn-xs"
+                onclick="testChannel('webpush')"
+              >
+                Send test
+              </button>
+              <span id="test-webpush" class="test-status"></span>
+            </div>
+          </div>
+        </div>
+        <!-- /notif-grid -->
+
+        <div class="config-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveConfig()">
+            Save all settings
+          </button>
+          <span
+            id="cfgStatus"
+            style="font-size: 12px; color: var(--accent)"
+          ></span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Chart modal -->
+    <div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+      <div class="modal">
+        <button class="close-btn" onclick="closeModal()">✕</button>
+        <h3 id="modalTitle"></h3>
+        <div class="sub" id="modalSub"></div>
+        <canvas id="priceChart" height="220"></canvas>
+      </div>
+    </div>
+
+    <script>
+      // ── State ─────────────────────────────────────────────────────────────────
+      let products = [];
+      let chartInst = null;
+      const filterDeals =
+        new URLSearchParams(location.search).get("filter") === "deals";
+
+      // ── Init ──────────────────────────────────────────────────────────────────
+      (async () => {
+        await loadProducts();
+        await loadConfig();
+        await initWebPush();
+        if (filterDeals)
+          document.getElementById("dealsBanner").classList.add("show");
+      })();
+
+      // ── API ───────────────────────────────────────────────────────────────────
+      async function api(path, opts = {}) {
+        const r = await fetch(path, {
+          headers: { "Content-Type": "application/json" },
+          ...opts,
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || "Request failed");
+        console.log("API", path, opts.method || "GET", j);
+        return j;
+      }
+
+      // ── Products ──────────────────────────────────────────────────────────────
+      async function loadProducts() {
+        products = await api("/api/products");
+        renderTable();
+      }
+
+      function isOnSale(p) {
+        const h = p.history || [];
+        if (h.length < 2) return false;
+        const cur = h[h.length - 1].price;
+        const max = Math.max(...h.slice(0, -1).map((x) => x.price));
+        return max > 0 && ((max - cur) / max) * 100 >= 1;
+      }
+
+      function renderTable() {
+        const tbody = document.getElementById("tbody");
+        const list = filterDeals ? products.filter(isOnSale) : products;
+
+        if (!list.length) {
+          tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${filterDeals ? "No deals right now." : "No products yet — add one above."}</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list
+          .map((p) => {
+            const h = p.history || [];
+            const cur = h.length ? h[h.length - 1].price : null;
+            const maxP =
+              h.length > 1
+                ? Math.max(...h.slice(0, -1).map((x) => x.price))
+                : null;
+
+            let badge = '<span class="badge-flat">—</span>';
+            if (cur !== null && maxP !== null) {
+              const pct = ((maxP - cur) / maxP) * 100;
+              if (pct > 0.5)
+                badge = `<span class="badge-sale">▼ ${pct.toFixed(1)}%</span>`;
+              else if (pct < -0.5)
+                badge = `<span class="badge-up">▲ ${Math.abs(pct).toFixed(1)}%</span>`;
+              else badge = `<span class="badge-flat">= flat</span>`;
+            }
+
+            const priceStr =
+              cur !== null
+                ? `<span class="cur">€</span>${cur.toFixed(2)}`
+                : '<span style="color:var(--muted)">—</span>';
+
+            const shortUrl = p.url
+              .replace(/^https?:\/\/(www\.)?/, "")
+              .slice(0, 42);
+
+            return `<tr>
+      <td class="name-cell">${esc(p.name || p.url)}</td>
+      <td class="url-cell"><a href="${esc(p.url)}" target="_blank">${esc(shortUrl)}</a></td>
+      <td class="price-cell">${priceStr}</td>
+      <td>${badge}</td>
+      <td><button class="chart-btn" onclick="openChart('${p.id}')">📈 chart</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-ghost" title="Refresh" onclick="refreshOne('${p.id}')">↻</button>
+        <button class="btn btn-danger" onclick="del('${p.id}')">✕</button>
+      </td>
+    </tr>`;
+          })
+          .join("");
+      }
+
+      async function addProduct() {
+        const url = document.getElementById("inUrl").value.trim();
+        const cls = document.getElementById("inClass").value.trim();
+        const name = document.getElementById("inName").value.trim();
+        const errEl = document.getElementById("addError");
+        const btn = document.getElementById("addBtn");
+
+        errEl.style.display = "none";
+        if (!url || !cls) {
+          showErr(errEl, "URL and CSS class are required.");
+          return;
+        }
+
+        btn.textContent = "Adding…";
+        btn.disabled = true;
+        try {
+          const p = await api("/api/products", {
+            method: "POST",
+            body: JSON.stringify({ url, css_class: cls, name }),
+          });
+          products.push(p);
+          renderTable();
+          ["inUrl", "inClass", "inName"].forEach(
+            (id) => (document.getElementById(id).value = ""),
+          );
+          setLastUpdate();
+        } catch (e) {
+          // Show more detailed error
+          let errorMsg = e.message;
+          if (errorMsg.includes("403")) {
+            errorMsg =
+              "The website is blocking access. Try:\n" +
+              "1. Check if the CSS class name is correct\n" +
+              "2. The site might have anti-bot protection\n" +
+              "3. Try a different product URL";
+          } else if (errorMsg.includes("Element with class")) {
+            errorMsg =
+              "Could not find the price element. Make sure the CSS class name is correct.";
+          }
+          showErr(errEl, errorMsg);
+        } finally {
+          btn.textContent = "Add product";
+          btn.disabled = false;
+        }
+      }
+      async function del(id) {
+        if (!confirm("Remove this product?")) return;
+        await api(`/api/products/${id}`, { method: "DELETE" });
+        products = products.filter((p) => p.id !== id);
+        renderTable();
+      }
+
+      async function refreshOne(id) {
+        const updated = await api(`/api/products/${id}/refresh`, {
+          method: "POST",
+        });
+        const i = products.findIndex((p) => p.id === id);
+        if (i !== -1) products[i] = updated;
+        renderTable();
+        setLastUpdate();
+      }
+
+      async function refreshAll() {
+        await api("/api/refresh-all", { method: "POST" });
+        await loadProducts();
+        setLastUpdate();
+      }
+
+      async function sendAllNotifications() {
+        try {
+          const r = await api("/api/notify", { method: "POST" });
+          if (r.message) {
+            alert(r.message);
+            return;
+          }
+          const ok = r.results
+            .filter((x) => x.ok)
+            .map((x) => x.channel)
+            .join(", ");
+          const err = r.results
+            .filter((x) => !x.ok)
+            .map((x) => `${x.channel}: ${x.error}`)
+            .join("\n");
+          let msg = ok ? `✓ Sent via: ${ok}` : "No channels succeeded.";
+          if (err) msg += `\n\nErrors:\n${err}`;
+          alert(msg);
+        } catch (e) {
+          alert("Error: " + e.message);
+        }
+      }
+
+      // ── Config ────────────────────────────────────────────────────────────────
+      const CH_MAP = {
+        email: { tog: "tog-email", key: "email_enabled" },
+        telegram: { tog: "tog-telegram", key: "telegram_enabled" },
+        ntfy: { tog: "tog-ntfy", key: "ntfy_enabled" },
+        gotify: { tog: "tog-gotify", key: "gotify_enabled" },
+      };
+
+      function toggleChannel(ch, on) {
+        document.getElementById(`ch-${ch}`).classList.toggle("active", on);
+      }
+
+      async function loadConfig() {
+        try {
+          const cfg = await api("/api/config");
+          if (cfg.base_url)
+            document.getElementById("cfgBaseUrl").value = cfg.base_url;
+          if (cfg.smtp_host)
+            document.getElementById("cfgSmtpHost").value = cfg.smtp_host;
+          if (cfg.smtp_port)
+            document.getElementById("cfgSmtpPort").value = cfg.smtp_port;
+          if (cfg.smtp_user)
+            document.getElementById("cfgSmtpUser").value = cfg.smtp_user;
+          if (cfg.smtp_from)
+            document.getElementById("cfgSmtpFrom").value = cfg.smtp_from;
+          if (cfg.smtp_to)
+            document.getElementById("cfgSmtpTo").value = cfg.smtp_to;
+          if (cfg.ntfy_server)
+            document.getElementById("cfgNtfyServer").value = cfg.ntfy_server;
+          if (cfg.ntfy_topic)
+            document.getElementById("cfgNtfyTopic").value = cfg.ntfy_topic;
+          if (cfg.gotify_server)
+            document.getElementById("cfgGotifyServer").value =
+              cfg.gotify_server;
+          if (cfg.telegram_chat_id)
+            document.getElementById("cfgTgChat").value = cfg.telegram_chat_id;
+
+          for (const [ch, { tog, key }] of Object.entries(CH_MAP)) {
+            const on = !!cfg[key];
+            document.getElementById(tog).checked = on;
+            toggleChannel(ch, on);
+          }
+        } catch {}
+      }
+
+      async function saveConfig() {
+        const cfg = {
+          base_url: document.getElementById("cfgBaseUrl").value.trim(),
+          smtp_host: document.getElementById("cfgSmtpHost").value.trim(),
+          smtp_port:
+            document.getElementById("cfgSmtpPort").value.trim() || "465",
+          smtp_user: document.getElementById("cfgSmtpUser").value.trim(),
+          smtp_from: document.getElementById("cfgSmtpFrom").value.trim(),
+          smtp_to: document.getElementById("cfgSmtpTo").value.trim(),
+          ntfy_server: document.getElementById("cfgNtfyServer").value.trim(),
+          ntfy_topic: document.getElementById("cfgNtfyTopic").value.trim(),
+          gotify_server: document
+            .getElementById("cfgGotifyServer")
+            .value.trim(),
+          telegram_chat_id: document.getElementById("cfgTgChat").value.trim(),
+        };
+        // Only include secrets if the user typed something
+        const smtpPass = document.getElementById("cfgSmtpPass").value;
+        if (smtpPass) cfg.smtp_password = smtpPass;
+        const tgToken = document.getElementById("cfgTgToken").value;
+        if (tgToken) cfg.telegram_token = tgToken;
+        const gotifyToken = document.getElementById("cfgGotifyToken").value;
+        if (gotifyToken) cfg.gotify_token = gotifyToken;
+
+        for (const [ch, { tog, key }] of Object.entries(CH_MAP)) {
+          cfg[key] = document.getElementById(tog).checked;
+        }
+
+        await api("/api/config", { method: "POST", body: JSON.stringify(cfg) });
+        const st = document.getElementById("cfgStatus");
+        st.textContent = "Saved ✓";
+        setTimeout(() => (st.textContent = ""), 3000);
+      }
+
+      async function testChannel(ch) {
+        const el = document.getElementById(`test-${ch}`);
+        el.textContent = "Sending…";
+        el.className = "test-status";
+        try {
+          await api(`/api/test-notify/${ch}`, { method: "POST" });
+          el.textContent = "✓ Sent!";
+          el.className = "test-status ok";
+        } catch (e) {
+          el.textContent = "✗ " + e.message;
+          el.className = "test-status err";
+        }
+        setTimeout(() => (el.textContent = ""), 8000);
+      }
+
+      function howToGetChatId() {
+        alert(
+          "How to get your Telegram Chat ID:\n\n" +
+            "1. Start a chat with your bot (or add it to a group).\n" +
+            "2. Send any message to it.\n" +
+            "3. Open this URL in a browser:\n" +
+            "   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates\n" +
+            "4. Find 'chat' → 'id' in the JSON response.",
+        );
+      }
+
+      // ── Chart ─────────────────────────────────────────────────────────────────
+      function openChart(id) {
+        const p = products.find((x) => x.id === id);
+        if (!p || !p.history.length) return;
+
+        document.getElementById("modalTitle").textContent = p.name || p.url;
+        document.getElementById("modalSub").textContent =
+          `${p.history.length} data point(s) · class: ${p.css_class}`;
+
+        const labels = p.history.map((h) =>
+          new Date(h.date).toLocaleDateString("es-ES"),
+        );
+        const prices = p.history.map((h) => h.price);
+        const maxP = Math.max(...prices);
+
+        if (chartInst) chartInst.destroy();
+        const ctx = document.getElementById("priceChart").getContext("2d");
+        chartInst = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Price (€)",
+                data: prices,
+                borderColor: "#34d399",
+                backgroundColor: "rgba(52,211,153,.08)",
+                pointBackgroundColor: prices.map((v) =>
+                  v < maxP ? "#34d399" : "#818cf8",
+                ),
+                pointRadius: 5,
+                tension: 0.3,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (c) => `€${c.parsed.y.toFixed(2)}`,
+                  afterLabel: (c) => {
+                    const pct = ((maxP - c.parsed.y) / maxP) * 100;
+                    return pct > 0.5 ? `▼ ${pct.toFixed(1)}% below peak` : "";
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: "#64748b" }, grid: { color: "#1e293b" } },
+              y: {
+                ticks: { color: "#64748b", callback: (v) => `€${v}` },
+                grid: { color: "#1e293b" },
+              },
+            },
+          },
+        });
+        document.getElementById("modalBackdrop").classList.add("open");
+      }
+
+      function closeModal(e) {
+        if (e && e.target !== document.getElementById("modalBackdrop")) return;
+        document.getElementById("modalBackdrop").classList.remove("open");
+      }
+
+      // ── Utils ─────────────────────────────────────────────────────────────────
+      function showErr(el, msg) {
+        el.textContent = msg;
+        el.style.display = "block";
+      }
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+      function setLastUpdate() {
+        document.getElementById("lastUpdate").textContent =
+          "Updated " +
+          new Date().toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+      }
+
+      // ── Web Push ───────────────────────────────────────────────────────────────
+      let swReg = null;
+
+      async function initWebPush() {
+        const statusEl = document.getElementById("webpush-status");
+        const btn = document.getElementById("webpush-btn");
+
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+          statusEl.textContent = "Not supported in this browser.";
+          return;
+        }
+        if (
+          location.protocol !== "https:" &&
+          location.hostname !== "localhost"
+        ) {
+          statusEl.textContent = "Requires HTTPS — see setup notes.";
+          return;
+        }
+
+        try {
+          swReg = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
+          });
+          await navigator.serviceWorker.ready;
+          btn.style.display = "inline-block";
+          await refreshPushState();
+        } catch (e) {
+          statusEl.textContent = "SW registration failed: " + e.message;
+        }
+      }
+
+      async function refreshPushState() {
+        if (!swReg) return;
+        const statusEl = document.getElementById("webpush-status");
+        const btn = document.getElementById("webpush-btn");
+        const cntEl = document.getElementById("webpush-sub-count");
+
+        const sub = await swReg.pushManager.getSubscription();
+        const perm = Notification.permission;
+
+        if (perm === "denied") {
+          statusEl.textContent =
+            "Notifications blocked — allow them in browser settings.";
+          statusEl.style.color = "var(--danger)";
+          btn.style.display = "none";
+          return;
+        }
+        if (sub) {
+          statusEl.textContent = "✓ Notifications enabled on this device.";
+          statusEl.style.color = "var(--accent)";
+          btn.textContent = "Disable notifications";
+          document.getElementById("ch-webpush").classList.add("active");
+        } else {
+          statusEl.textContent =
+            "Notifications not enabled on this device yet.";
+          statusEl.style.color = "var(--muted)";
+          btn.textContent = "Enable notifications";
+          document.getElementById("ch-webpush").classList.remove("active");
+        }
+        btn.style.display = "inline-block";
+
+        // Show total count from server
+        try {
+          const r = await api("/api/push/subscriptions/count");
+          cntEl.textContent =
+            r.count > 0 ? `${r.count} device(s) subscribed total` : "";
+        } catch {}
+      }
+
+      async function togglePushSubscription() {
+        if (!swReg) return;
+        const sub = await swReg.pushManager.getSubscription();
+        if (sub) {
+          await sub.unsubscribe();
+          await fetch("/api/push/unsubscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+        } else {
+          const keyResp = await api("/api/push/vapid-public-key");
+          const vapidKey = urlBase64ToUint8Array(keyResp.key);
+          try {
+            const newSub = await swReg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: vapidKey,
+            });
+            await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(newSub.toJSON()),
+            });
+          } catch (e) {
+            alert("Could not subscribe: " + e.message);
+          }
+        }
+        await refreshPushState();
+      }
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding)
+          .replace(/-/g, "+")
+          .replace(/_/g, "/");
+        const raw = atob(base64);
+        return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+      }
+    </script>
+    <script>
+      const selector = document.getElementById("themeSelector");
+
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("theme", theme);
+      }
+
+      selector.addEventListener("change", (e) => setTheme(e.target.value));
+
+      // load saved theme
+      const saved = localStorage.getItem("theme") || "01";
+      selector.value = saved;
+      setTheme(saved);
+    </script>
+  </body>
+</html>

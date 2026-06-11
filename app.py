@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import smtplib
 import socket
@@ -7,16 +6,29 @@ import ssl
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import os
 
-import requests
-from bs4 import BeautifulSoup
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, render_template, send_from_directory
+from scraper_utils import scrape_with_retry, parse_price
 
-app = Flask(__name__)
+# Single Flask app instance (fix: was incorrectly instantiated twice)
+app = Flask(
+    __name__,
+    static_folder="static",
+    static_url_path="/static"
+)
+
 DB_FILE = "products.json"
 CONFIG_FILE = "config.json"
 
 
+@app.route("/styles/<path:filename>")
+def styles(filename):
+    return send_from_directory("styles", filename)  # fix: was app.send_from_directory
+
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory("static", "sw.js")  # fix: was app.send_from_directory
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def load_db():
@@ -62,46 +74,13 @@ def get_base_url(cfg):
     return f"http://{ip}:{port}"
 
 
-# ── Scraping ──────────────────────────────────────────────────────────────────
-
-def parse_price(text):
-    text = text.strip()
-    text = re.sub(r"[€$£¥\s]", "", text)
-    m = re.match(r"^([\d.,]+)$", text)
-    if not m:
-        return None
-    raw = m.group(1)
-    if re.search(r",\d{2}$", raw):
-        raw = raw.replace(".", "").replace(",", ".")
-    else:
-        raw = raw.replace(",", "")
-    try:
-        return float(raw)
-    except ValueError:
-        return None
-
-
+# ── Scraping — delegated to scraper_utils.scrape_with_retry ─────────────────
+# parse_price and scrape_with_retry are imported from scraper_utils at the top.
+# scrape_with_retry uses Playwright (headless Chromium) as primary strategy,
+# with a requests/bs4 fallback for simple static pages.
 def scrape_price(url, css_class):
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-        ),
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-    }
-    try:
-        r = requests.get(url, headers=headers, timeout=15)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        el = soup.find(class_=css_class)
-        if not el:
-            return None, f"Element with class '{css_class}' not found"
-        price = parse_price(el.get_text())
-        if price is None:
-            return None, f"Could not parse price from: '{el.get_text().strip()}'"
-        return price, None
-    except requests.exceptions.RequestException as e:
-        return None, str(e)
+    """Thin wrapper kept so the rest of app.py doesn't need to change."""
+    return scrape_with_retry(url, css_class)
 
 
 # ── Deal detection ─────────────────────────────────────────────────────────────
@@ -159,7 +138,7 @@ def _send_email(cfg, deals, base_url):
             f"</tr>"
         )
     html = f"""
-    <html><body style='background:#0f172a;color:#e2e8f0;font-family:sans-serif;padding:24px'>
+    <html><body style='background:#0f172a;color:#e2e8f0;font-family:var(--font-family);padding:24px'>
     <h2 style='color:#6ee7b7'>🏷️ Price Drops Today</h2>
     <table style='border-collapse:collapse;width:100%;max-width:640px'>
       <thead><tr style='color:#94a3b8;font-size:12px;text-transform:uppercase'>
@@ -174,7 +153,7 @@ def _send_email(cfg, deals, base_url):
       <a href='{base_url}/?filter=deals'
          style='background:#34d399;color:#0b1120;padding:10px 20px;
                 border-radius:6px;text-decoration:none;font-weight:700'>
-        Open PriceWatch →
+        Open PriceTracker →
       </a>
     </p>
     </body></html>
@@ -194,10 +173,10 @@ def _send_telegram(cfg, deals, base_url):
     token = cfg["telegram_token"]
     chat_id = cfg["telegram_chat_id"]
     text = _deals_summary_text(deals, base_url)
-    # Inline keyboard with a single "Open PriceWatch" button
+    # Inline keyboard with a single "Open PriceTracker" button
     keyboard = {
         "inline_keyboard": [[{
-            "text": "Open PriceWatch →",
+            "text": "Open PriceTracker →",
             "url": f"{base_url}/?filter=deals"
         }]]
     }
@@ -224,7 +203,7 @@ def _send_ntfy(cfg, deals, base_url):
             "Priority": "high",
             "Tags":     "shopping,tada",
             "Click":    f"{base_url}/?filter=deals",
-            "Actions":  f"view, Open PriceWatch, {base_url}/?filter=deals",
+            "Actions":  f"view, Open PriceTracker, {base_url}/?filter=deals",
         },
         timeout=10,
     ).raise_for_status()
@@ -495,7 +474,7 @@ def _ensure_tls_cert(cert_file="cert.pem", key_file="key.pem"):
         local_ip = "127.0.0.1"
 
     name = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "pricewatch.local"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "PriceTracker.local"),
     ])
     san = x509.SubjectAlternativeName([
         x509.DNSName("localhost"),
@@ -525,22 +504,6 @@ def _ensure_tls_cert(cert_file="cert.pem", key_file="key.pem"):
     return cert_file, key_file
 
 
-if __name__ == "__main__":
-    _ensure_vapid_keys()
-    cert, key = _ensure_tls_cert()
-
-    cfg  = load_config()
-    port = int(cfg.get("port", 5000))
-
-    if cert and key:
-        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_ctx.load_cert_chain(cert, key)
-        print(f"[pricewatch] Running on https://0.0.0.0:{port}  (self-signed TLS)")
-        print(f"[pricewatch] First visit: accept the certificate warning in your browser.")
-        app.run(host="0.0.0.0", port=port, debug=False, ssl_context=(cert, key))
-    else:
-        print(f"[pricewatch] Running on http://0.0.0.0:{port}  (no TLS — web push won't work from other devices)")
-        app.run(host="0.0.0.0", port=port, debug=False)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -598,7 +561,7 @@ def _send_web_push(cfg, deals, base_url):
 
     vapid_private = cfg.get("vapid_private_key")
     vapid_public  = cfg.get("vapid_public_key")
-    vapid_email   = cfg.get("vapid_email", "mailto:admin@pricewatch.local")
+    vapid_email   = cfg.get("vapid_email", "mailto:admin@PriceTracker.local")
 
     if not vapid_private or not vapid_public:
         raise ValueError("VAPID keys not configured")
@@ -608,10 +571,10 @@ def _send_web_push(cfg, deals, base_url):
         lines.append(f"• {d['name']}  {d['prev_price']:.2f}€ → {d['price']:.2f}€  (-{d['discount']:.1f}%)")
 
     payload = json.dumps({
-        "title": f"🏷️ {len(deals)} deal(s) on PriceWatch",
+        "title": f"🏷️ {len(deals)} deal(s) on PriceTracker",
         "body":  "\n".join(lines[1:]) or "Tap to see the deals.",
         "url":   f"{base_url}/?filter=deals",
-        "tag":   "pricewatch-deals",
+        "tag":   "PriceTracker-deals",
     })
 
     results = []
@@ -637,3 +600,19 @@ def _send_web_push(cfg, deals, base_url):
         save_push_subs(alive)
 
     return results
+if __name__ == "__main__":
+    _ensure_vapid_keys()
+    cert, key = _ensure_tls_cert()
+
+    cfg  = load_config()
+    port = int(cfg.get("port", 5000))
+
+    if cert and key:
+        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_ctx.load_cert_chain(cert, key)
+        print(f"[PriceTracker] Running on https://0.0.0.0:{port}  (self-signed TLS)")
+        print(f"[PriceTracker] First visit: accept the certificate warning in your browser.")
+        app.run(host="0.0.0.0", port=port, debug=False, ssl_context=(cert, key))
+    else:
+        print(f"[PriceTracker] Running on http://0.0.0.0:{port}  (no TLS — web push won't work from other devices)")
+        app.run(host="0.0.0.0", port=port, debug=False)

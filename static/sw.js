@@ -1,14 +1,14 @@
-// PriceWatch Service Worker — handles incoming push notifications
+// PriceTracker Service Worker — handles incoming push notifications
 
 self.addEventListener("push", (event) => {
   let data = {};
-  try { data = event.data.json(); } catch { data = { title: "PriceWatch", body: event.data.text() }; }
+  try { data = event.data.json(); } catch { data = { title: "PriceTracker", body: event.data.text() }; }
 
   const options = {
     body:    data.body  || "New price drops detected.",
     icon:    "/static/icon.png",
     badge:   "/static/icon.png",
-    tag:     data.tag   || "pricewatch",
+    tag:     data.tag   || "PriceTracker",
     renotify: true,
     requireInteraction: true,
     data:    { url: data.url || "/" },
@@ -19,7 +19,7 @@ self.addEventListener("push", (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "🏷️ PriceWatch", options)
+    self.registration.showNotification(data.title || "🏷️ PriceTracker", options)
   );
 });
 
@@ -30,7 +30,7 @@ self.addEventListener("notificationclick", (event) => {
   const target = event.notification.data?.url || "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      // Focus an existing PriceWatch tab if open
+      // Focus an existing PriceTracker tab if open
       for (const client of list) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
           client.navigate(target);
