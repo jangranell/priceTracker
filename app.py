@@ -8,35 +8,14 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 
-<<<<<<< HEAD
-from flask import Flask, jsonify, request, render_template, send_from_directory
-from scraper_utils import scrape_with_retry, parse_price
-
-# Single Flask app instance (fix: was incorrectly instantiated twice)
-app = Flask(
-    __name__,
-    static_folder="static",
-    static_url_path="/static"
-)
-=======
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request, render_template, send_from_directory  # type: ignore[import]  # pylint: disable=import-error
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 
 DB_FILE = "products.json"
 CONFIG_FILE = "config.json"
 
 
-<<<<<<< HEAD
-@app.route("/styles/<path:filename>")
-def styles(filename):
-    return send_from_directory("styles", filename)  # fix: was app.send_from_directory
-
-@app.route("/sw.js")
-def service_worker():
-    return send_from_directory("static", "sw.js")  # fix: was app.send_from_directory
-=======
 app = Flask(
     __name__,
     static_folder="static",
@@ -50,7 +29,6 @@ def styles(filename):
 @app.route("/sw.js")
 def service_worker():
     return app.send_from_directory("static", "sw.js")
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def load_db():
@@ -96,15 +74,6 @@ def get_base_url(cfg):
     return f"http://{ip}:{port}"
 
 
-<<<<<<< HEAD
-# ── Scraping — delegated to scraper_utils.scrape_with_retry ─────────────────
-# parse_price and scrape_with_retry are imported from scraper_utils at the top.
-# scrape_with_retry uses Playwright (headless Chromium) as primary strategy,
-# with a requests/bs4 fallback for simple static pages.
-def scrape_price(url, css_class):
-    """Thin wrapper kept so the rest of app.py doesn't need to change."""
-    return scrape_with_retry(url, css_class)
-=======
 # ── Scraping ──────────────────────────────────────────────────────────────────
 
 def parse_price(text):
@@ -168,7 +137,6 @@ def scrape_price(url, css_class):
             if e.response.status_code == 403:
                 return None, f"Website blocked the request (403). Try: 1) Check if the CSS class is correct 2) The site may have anti-bot protection"
         return None, str(e)
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 
 
 # ── Deal detection ─────────────────────────────────────────────────────────────
@@ -702,8 +670,4 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=port, debug=False, ssl_context=(cert, key))
     else:
         print(f"[PriceTracker] Running on http://0.0.0.0:{port}  (no TLS — web push won't work from other devices)")
-<<<<<<< HEAD
         app.run(host="0.0.0.0", port=port, debug=False)
-=======
-        app.run(host="0.0.0.0", port=port, debug=False)
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)

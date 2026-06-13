@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PriceTracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<<<<<<< HEAD
-=======
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
@@ -19,14 +16,9 @@
       <div class="logo">Price<span>Tracker</span></div>
       <div class="spacer"></div>
       <select id="themeSelector" class="btn btn-secondary">
-<<<<<<< HEAD
-        <option value="01">01</option>
-        <option value="light">Light</option>
-=======
         <option value="dark">Dark</option>
         <option value="01">01</option>
         <option value="00">00</option>
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
       </select>
       <div id="lastUpdate" class="badge">Never refreshed</div>
     </header>
@@ -75,11 +67,8 @@
         <table>
           <thead>
             <tr>
-<<<<<<< HEAD
-=======
               <!-- add the favicon as a new column-->
               <th>Icon</th>
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
               <th>Product</th>
               <th>URL</th>
               <th>Price</th>
@@ -466,20 +455,6 @@
             const shortUrl = p.url
               .replace(/^https?:\/\/(www\.)?/, "")
               .slice(0, 42);
-<<<<<<< HEAD
-
-            return `<tr>
-      <td class="name-cell">${esc(p.name || p.url)}</td>
-      <td class="url-cell"><a href="${esc(p.url)}" target="_blank">${esc(shortUrl)}</a></td>
-      <td class="price-cell">${priceStr}</td>
-      <td>${badge}</td>
-      <td><button class="chart-btn" onclick="openChart('${p.id}')">📈 chart</button></td>
-      <td style="white-space:nowrap">
-        <button class="btn-ghost" title="Refresh" onclick="refreshOne('${p.id}')">↻</button>
-        <button class="btn btn-danger" onclick="del('${p.id}')">✕</button>
-      </td>
-    </tr>`;
-=======
             /*get the domain from the request*/
             const domain = new URL(p.url).hostname;
 
@@ -495,7 +470,6 @@
           <button class="btn btn-danger" onclick="del('${p.id}')">✕</button>
         </td>
       </tr>`;
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
           })
           .join("");
       }
@@ -513,12 +487,8 @@
           return;
         }
 
-<<<<<<< HEAD
-        btn.textContent = "Adding…";
-=======
         btn.innerHTML =
           '<svg class="mr-3 -ml-1 size-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Adding…';
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
         btn.disabled = true;
         try {
           const p = await api("/api/products", {
@@ -753,11 +723,7 @@
             scales: {
               x: { ticks: { color: "#64748b" }, grid: { color: "#1e293b" } },
               y: {
-<<<<<<< HEAD
-                ticks: { color: "#64748b", callback: (v) => `€${v}` },
-=======
                 ticks: { color: "#64748b", callback: (v) => `€${v}€` },
->>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
                 grid: { color: "#1e293b" },
               },
             },
