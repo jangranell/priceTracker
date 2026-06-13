@@ -4,4 +4,8 @@ beautifulsoup4>=4.12
 lxml>=5.0
 pywebpush>=2.0
 cryptography>=42.0
+<<<<<<< HEAD
 playwright>=1.44
+=======
+gunicorn>=20.0
+>>>>>>> 7e0c87e (Add gunicorn to requirements)
