@@ -19,25 +19,55 @@
 }
 
 /* ── THEME VARIABLES (default theme) ── */
+<<<<<<< HEAD
 :root[data-theme="01"] {
+=======
+:root[data-theme="dark"] {
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
   --bg: #181818;
   --surface: #2a2a2a;
   --surface2: #1f1f1f;
   --border: #3a3a3a;
   --text: #e0e0e0;
   --muted: #9e9e9e;
+<<<<<<< HEAD
   --accent: #9541ce;
   --accent-rgb: 149, 65, 206;
   --accent2: #55d355;
   --accent2-rgb: 162, 220, 87;
   --accent3: #fb9c20;
   --accent3-rgb: 251, 156, 32;
+=======
+  --accent: #C6FD0E;
+  --accent-rgb: 198, 253, 14;
+  --accent2: #5cfaf5;
+  --accent2-rgb: 92, 250, 245;
+  --danger: #ef4444;
+  --warn: #f59e0b;
+}
+:root[data-theme="01"] {
+  --bg: #765896;
+  --surface: #2a2a2a;
+  --surface2: #1f1f1f;
+  --border: #3a3a3a;
+  --text: #e0e0e0;
+  --muted: #9e9e9e;
+
+  --accent: #a2dc57;
+  --accent-rgb: 162, 220, 87a;
+  --accent2: ##fa9c20;
+  --accent2-rgb: 250, 156, 32;
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
   --danger: #ef4444;
   --warn: #f59e0b;
 }
 
 /* optional second theme */
+<<<<<<< HEAD
 :root[data-theme="light"] {
+=======
+:root[data-theme="00"] {
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
   --bg: #f5f7fb;
   --surface: #ffffff;
   --surface2: #e9eef5;
@@ -48,8 +78,11 @@
   --accent-rgb: 237, 149, 39;
   --accent2: #831418;
   --accent2-rgb: 131, 20, 24;
+<<<<<<< HEAD
   --accent3: #1b4d56;
   --accent3-rgb: 27, 77, 86;
+=======
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
   --danger: #dc2626;
   --warn: #d97706;
 }
@@ -77,7 +110,11 @@ header {
   background: var(--surface);
 }
 .logo {
+<<<<<<< HEAD
   font-size: var(--font-size) * 1.5;
+=======
+  font-size: var(--font-size) * 1.25;
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
   font-weight: 700;
   letter-spacing: -0.5px;
   color: var(--accent2);

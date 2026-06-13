@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 scraper_utils.py — Playwright-based scraper with graceful bs4 fallback.
 
@@ -224,3 +225,50 @@ def scrape_with_retry(
 
     # Return the Playwright error if it's more descriptive
     return None, last_err if use_playwright else err
+=======
+import random
+import time
+import requests
+from bs4 import BeautifulSoup
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
+
+def scrape_with_retry(url, css_class, max_retries=3):
+    for attempt in range(max_retries):
+        headers = {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+        }
+        
+        try:
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            # Add small delay between retries
+            if attempt > 0:
+                time.sleep(2 ** attempt)  # Exponential backoff
+            
+            r = session.get(url, timeout=15, allow_redirects=True)
+            
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                el = soup.find(class_=css_class)
+                if el:
+                    return parse_price(el.get_text()), None
+            elif r.status_code == 403 and attempt < max_retries - 1:
+                continue  # Retry with different User-Agent
+                
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return None, f"Failed after {max_retries} attempts: {str(e)}"
+            continue
+    
+    return None, f"Could not scrape {url} after {max_retries} attempts"
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)

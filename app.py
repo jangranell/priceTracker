@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 
+<<<<<<< HEAD
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from scraper_utils import scrape_with_retry, parse_price
 
@@ -17,11 +18,17 @@ app = Flask(
     static_folder="static",
     static_url_path="/static"
 )
+=======
+import requests
+from bs4 import BeautifulSoup
+from flask import Flask, jsonify, request, render_template, send_from_directory  # type: ignore[import]  # pylint: disable=import-error
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 
 DB_FILE = "products.json"
 CONFIG_FILE = "config.json"
 
 
+<<<<<<< HEAD
 @app.route("/styles/<path:filename>")
 def styles(filename):
     return send_from_directory("styles", filename)  # fix: was app.send_from_directory
@@ -29,6 +36,21 @@ def styles(filename):
 @app.route("/sw.js")
 def service_worker():
     return send_from_directory("static", "sw.js")  # fix: was app.send_from_directory
+=======
+app = Flask(
+    __name__,
+    static_folder="static",
+    static_url_path="/static"
+)
+
+@app.route("/styles/<path:filename>")
+def styles(filename):
+    return app.send_from_directory("styles", filename)
+
+@app.route("/sw.js")
+def service_worker():
+    return app.send_from_directory("static", "sw.js")
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def load_db():
@@ -74,6 +96,7 @@ def get_base_url(cfg):
     return f"http://{ip}:{port}"
 
 
+<<<<<<< HEAD
 # ── Scraping — delegated to scraper_utils.scrape_with_retry ─────────────────
 # parse_price and scrape_with_retry are imported from scraper_utils at the top.
 # scrape_with_retry uses Playwright (headless Chromium) as primary strategy,
@@ -81,6 +104,71 @@ def get_base_url(cfg):
 def scrape_price(url, css_class):
     """Thin wrapper kept so the rest of app.py doesn't need to change."""
     return scrape_with_retry(url, css_class)
+=======
+# ── Scraping ──────────────────────────────────────────────────────────────────
+
+def parse_price(text):
+    text = text.strip()
+    text = re.sub(r"[€$£¥\s]", "", text)
+    m = re.match(r"^([\d.,]+)$", text)
+    if not m:
+        return None
+    raw = m.group(1)
+    if re.search(r",\d{2}$", raw):
+        raw = raw.replace(".", "").replace(",", ".")
+    else:
+        raw = raw.replace(",", "")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+def scrape_price(url, css_class):
+    # ...existing code...
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+    }
+    
+    response = requests.get(url, headers=headers, timeout=10)
+    # ...rest of code...
+
+    try:
+        # Add session for cookies and better handling
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        # First request to get cookies
+        r = session.get(url, timeout=15, allow_redirects=True)
+        r.raise_for_status()
+        
+        soup = BeautifulSoup(r.text, "html.parser")
+        el = soup.find(class_=css_class)
+        if not el:
+            # Try to find by alternative selectors
+            el = soup.find(class_=css_class) or soup.find(attrs={"class": css_class})
+            if not el:
+                return None, f"Element with class '{css_class}' not found"
+        
+        price = parse_price(el.get_text())
+        if price is None:
+            return None, f"Could not parse price from: '{el.get_text().strip()}'"
+        return price, None
+    except requests.exceptions.RequestException as e:
+        # Better error message
+        if hasattr(e, 'response') and e.response is not None:
+            if e.response.status_code == 403:
+                return None, f"Website blocked the request (403). Try: 1) Check if the CSS class is correct 2) The site may have anti-bot protection"
+        return None, str(e)
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
 
 
 # ── Deal detection ─────────────────────────────────────────────────────────────
@@ -391,25 +479,24 @@ def test_notify(channel):
     """Send a test notification on a single channel."""
     cfg = load_config()
     base_url = get_base_url(cfg)
-    fake_deals = [{
-        "id": "test",
-        "name": "Test Product",
-        "url": "https://example.com",
-        "price": 89.99,
-        "prev_price": 119.99,
-        "discount": 25.0,
-    }]
+    
+    # Use real deals from tracked products
+    deals = get_deals()
+    
+    if not deals:
+        return jsonify({"message": "No deals right now — add products with price drops to test"}), 200
+    
     try:
         if channel == "email":
-            _send_email(cfg, fake_deals, base_url)
+            _send_email(cfg, deals, base_url)
         elif channel == "telegram":
-            _send_telegram(cfg, fake_deals, base_url)
+            _send_telegram(cfg, deals, base_url)
         elif channel == "ntfy":
-            _send_ntfy(cfg, fake_deals, base_url)
+            _send_ntfy(cfg, deals, base_url)
         elif channel == "gotify":
-            _send_gotify(cfg, fake_deals, base_url)
+            _send_gotify(cfg, deals, base_url)
         elif channel == "webpush":
-            results = _send_web_push(cfg, fake_deals, base_url)
+            results = _send_web_push(cfg, deals, base_url)
             if not results:
                 return jsonify({"error": "No browser subscriptions yet — enable notifications in the UI first."}), 400
             failed = [r for r in results if not r["ok"]]
@@ -417,7 +504,7 @@ def test_notify(channel):
                 return jsonify({"error": str(failed[0]["error"])}), 500
         else:
             return jsonify({"error": "Unknown channel"}), 400
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "deals_sent": len(deals)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -615,4 +702,8 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=port, debug=False, ssl_context=(cert, key))
     else:
         print(f"[PriceTracker] Running on http://0.0.0.0:{port}  (no TLS — web push won't work from other devices)")
+<<<<<<< HEAD
         app.run(host="0.0.0.0", port=port, debug=False)
+=======
+        app.run(host="0.0.0.0", port=port, debug=False)
+>>>>>>> 4724843 (Add service worker for push notifications and create main HTML template)
